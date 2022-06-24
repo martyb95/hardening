@@ -1,0 +1,20 @@
+--
+version: '2.3'
+services:
+    portainer:
+        image: portainer/portainer-ce
+        container_name: portainer
+        restart: unless-stopped
+        ports:
+          - 7443:9000
+		volumes:
+          - ./portainer/ssl:/certs
+          - ./portainer/:/data
+        command:
+          --ssl
+          --sslcert /certs/portainer.crt
+          --sslkey /certs/portainer.key
+        security_opt:
+          - no-new-privileges:true
+
+    
