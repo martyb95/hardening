@@ -49,5 +49,5 @@ services:
 networks:
   default:
     external: true
-    name: HostNet
+    name: CG_Cloud
     
