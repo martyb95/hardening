@@ -16,8 +16,3 @@ services:
           --sslkey /certs/portainer.key
         security_opt:
           - no-new-privileges:true
-        
-networks:
-  default:
-    external: true
-    name: CG_Cloud
