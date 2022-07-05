@@ -24,8 +24,8 @@ services:
       # Uncomment this if IPv6 is not enabled on your host
       DISABLE_IPV6: 'true'
     volumes:
-      - ./nginxpm:/data
-      - ./nginxpm/letsencrypt:/etc/letsencrypt
+      - /home/docker/nginxpm:/data
+      - /home/docker/nginxpm/letsencrypt:/etc/letsencrypt
     depends_on:
       - db
     security_opt:
@@ -41,8 +41,8 @@ services:
       MYSQL_USER: 'npm'
       MYSQL_PASSWORD: '4x?9HhvX%4tyu$$6xQmdz39syz'
     volumes:
-      - ./mysql:/var/lib/mysql
-      - ./mysql/conf:/config
+      - /home/docker/mysql:/var/lib/mysql
+      - /home/docker/mysql/conf:/config
     security_opt:
       - no-new-privileges:true
         
