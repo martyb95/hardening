@@ -7,8 +7,8 @@ services:
         ports:
           - 7443:9000
         volumes:
-          - ./portainer/ssl:/certs
-          - ./portainer/:/data
+          - /home/docker/portainer/ssl:/certs
+          - /home/docker/portainer/:/data
         command:
           --ssl
           --sslcert /certs/portainer.crt
