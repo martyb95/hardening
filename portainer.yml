@@ -8,6 +8,7 @@ services:
             - 7443:9443
             - 7900:9000
         volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
             - /home/docker/portainer/ssl:/certs
             - /home/docker/portainer/:/data
         command:
