@@ -10,9 +10,8 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-      
+
 networks:
   default:
     external: true
     name: CG_Cloud
-	  
