@@ -5,13 +5,14 @@ services:
         container_name: portainer
         restart: unless-stopped
         ports:
-          - 7443:9000
-        volumes:
-          - /home/docker/portainer/ssl:/certs
-          - /home/docker/portainer/:/data
+            - 7443:9443
+            - 7900:9000
+		volumes:
+            - /home/docker/portainer/ssl:/certs
+            - /home/docker/portainer/:/data
         command:
-          --ssl
-          --sslcert /certs/portainer.crt
-          --sslkey /certs/portainer.key
+            --ssl
+            --sslcert /certs/portainer.crt
+            --sslkey /certs/portainer.key
         security_opt:
           - no-new-privileges:true
