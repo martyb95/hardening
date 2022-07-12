@@ -23,6 +23,7 @@ OVERWRITE='\e[1A\e[K'
 USR='docker'
 USR-PWD='Docker!2022'
 CAREGO='192.168.10.75'
+NET='CG_Cloud'
 
 
 # _header colorize the given argument with spacing
@@ -33,7 +34,7 @@ function _task {
     fi
     # set new task title and print
     TASK=$1
-    printf "${LBLACK} [ ]  ${TASK} \n${LRED}"
+    printf "${LCYAN} [ ]  ${TASK} \n${LRED}"
 }
 
 # _cmd performs commands with error checking
@@ -105,20 +106,6 @@ function _AskYN()
   REPLY=${REPLY^^}
 }
 
-function Spinner()
-{
-	pid=$! # Process Id of the previous running command
-	spin='-\|/'
-	i=0
-	while kill -0 $pid 2>/dev/null
-	do
-		i=$(( (i+1) %4 ))
-		printf "\r${spin:$i:1}"
-		sleep .1
-	done
-	printf "\r"
-}
-
 
 clear
 
@@ -137,10 +124,10 @@ printf "${CYAN}
   ██╔══██║██╔══██║██╔══██╗██║  ██║██╔══╝  ██║╚██╗██║██║██║╚██╗██║██║   ██║
   ██║  ██║██║  ██║██║  ██║██████╔╝███████╗██║ ╚████║██║██║ ╚████║╚██████╔╝
   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚═════╝
-
- ${YELLOW}Hardening Linux Servers    ${LPURPLE}Ver 1.35 ${RESTORE}
-
 "
+printf "\n         ${YELLOW}Hardening Linux UBUNTU Servers         ${LPURPLE}Ver 1.35${RESTORE}"
+printf "                                                                    ${YELLOW}by: ${LPURPLE}Martin Boni${RESTORE}\n\n\n"
+
 
 # script must be run as root
 if [[ $(id -u) -ne 0 ]] ; then printf "\n${LRED} Please run as root${RESTORE}\n\n" ; exit 1 ; fi
@@ -150,10 +137,14 @@ if [[ ${REPLY^^} != "Y" ]] ; then exit 0 ; fi
 printf "\n"
 _Ask "Change ssh port" "22" && __Port=$REPLY
 _AskYN "Install Docker (y/n)" "Y" && __Dock=$REPLY
-_AskYN "Install NGINX Proxy Manager (y/n)" "Y" && __NGINX=$REPLY
-_AskYN "Install Docker User (y/n)" "Y" && __DockUsr=$REPLY
-_AskYN "Install Portainer (y/n)" "Y" && __Portainer=$REPLY
-_AskYN "Install Watchtower (y/n)" "Y" && __Watchtower=$REPLY
+if [[ $__Dock == "Y" ]]; then
+    _AskYN "Install NGINX Proxy Manager (y/n)" "Y" && __NGINX=$REPLY
+    _AskYN "Install Docker User (y/n)" "Y" && __DockUsr=$REPLY
+    _AskYN "Install Portainer (y/n)" "Y" && __Portainer=$REPLY
+    _AskYN "Install Dozzle (y/n)" "Y" && __Dozzle=$REPLY
+    _AskYN "Install Watchtower (y/n)" "Y" && __Watchtower=$REPLY
+fi
+
 printf "\n\n"
 
 
@@ -162,31 +153,42 @@ printf "\n\n"
 
 # update OS dependencies
 _task "update operating system"
-    _cmd 'sudo apt  update'
-    _cmd 'sudo apt full-upgrade -y'
+    _cmd 'sudo apt-get  update'
+    _cmd 'sudo apt-get full-upgrade -y'
 
 
 # update application dependencies
 _task "update app dependencies"
-    _cmd 'sudo apt install nano wget iptables ufw sed -y'
+    _cmd 'sudo apt-get install nano curl wget ufw sed -y'
+   _cmd 'sudo apt-get full-upgrade -y'
 
 
-# Install Lynis
-TMP=$(lynis show version)
-_task "install Lynis audit software"
-	if [[ "$TMP" != "3."* ]]; then 
-	   _cmd 'wget -O - https://packages.cisofy.com/keys/cisofy-software-public.key | sudo apt-key add -'
-	   _cmd 'echo "deb https://packages.cisofy.com/community/lynis/deb/ stable main" | sudo tee /etc/apt/sources.list.d/cisofy-lynis.list'
-    fi
-	_cmd 'apt update'
-	_cmd 'apt install lynis'
+# remove existing applications
+service docker status >/dev/null 2>&1
+ISACT=$?
+_task "remove apps to be reinstalled"
+     _cmd 'sudo apt-get purge --auto-remove lynis fail2ban -y'
+	 if [ "${ISACT}" = 0 ]; then _cmd 'sudo systemctl stop docker'; fi
+     if [[ $(which docker) && $(sudo docker --version) ]]; then
+        _cmd 'sudo apt-get remove docker docker-engine docker.io containerd runc -y'
+        _cmd 'sudo apt-get purge docker-ce docker-ce-cli containerd.io docker-compose -y'
+	    _cmd 'sudo rm -f /usr/share/keyrings/docker-archive-keyring.gpg'
+        _cmd 'sudo rm -rf /var/lib/docker'
+        _cmd 'sudo rm -rf /var/lib/containerd'
+       _cmd 'sudo rm -f /usr/local/bin/docker-compose'
+     fi
+     _cmd 'sudo apt update'
+     _cmd 'sudo apt-get autoremove -y'
+     _cmd 'sudo apt-get autoclean -y'
+printf "${OVERWRITE}"
 
 
-# Install Fail2Ban
-_task "install Fail2Ban"
-	_cmd 'apt install fail2ban -y'
-	_cmd 'sudo systemctl status fail2ban'
-	_cmd 'sudo cp /etc/fail2ban/jail.{conf,local}'
+# update shell command prompt
+PRPT="\[\033[0;31m\]\342\224\214\342\224\200\[\[\033[0;39m\]\u\[\033[01;33m\]@\[\033[01;96m\]\h\[\033[0;31m\]]\342\224\200[\[\033[0;32m\]\w\[\033[0;31m\]]\n\[\033[0;31m\]\342\224\224\342\224\200\342\224\200\342\224\200 \[\033[0m\]\[\e[01;33m\]\\$\[\e[0m\]"
+_task "update shell command prompt"
+    _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /etc/bash.bashrc'
+    if [[ -d "/home/martin" ]]; then _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /home/martin/.bashrc'; fi
+    if [[ ${USER} != "root" ]]; then _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /home/${USER}/.bashrc'; fi
 
 
 # Update Nameservers
@@ -207,9 +209,6 @@ _task "update ntp servers"
 _task "download and update sysctl.conf"
     _cmd 'sudo wget --timeout=5 --tries=2 --quiet -c https://raw.githubusercontent.com/conduro/ubuntu/main/sysctl.conf -O /etc/sysctl.conf'
 
-# Download and Update sshd_config
-_task "download and update sshd_config"
-    _cmd 'sudo wget --timeout=5 --tries=2 --quiet -c https://raw.githubusercontent.com/conduro/ubuntu/main/sshd.conf -O /etc/ssh/sshd_config'
 
 # disable system logging
 _task "disable system logging"
@@ -231,7 +230,6 @@ _task "disable snapd"
 FILE="ip4.txt"
 CF="https://www.cloudflare.com/ips-v4"
 IP4=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
-
 _task "configure firewall"
     _cmd 'sudo ufw disable'
     _cmd 'echo "y" | sudo ufw reset'
@@ -241,36 +239,114 @@ _task "configure firewall"
     _cmd 'sudo ufw allow from ${CAREGO} to any port 3389 proto tcp comment "rdp"'
     _cmd 'sudo ufw allow from ${CAREGO} to any port ${__Port} proto tcp comment "ssh"'
     _cmd 'sudo ufw limit ${__Port}'
-    if [[ $__Port != "22" ]]; then
-       _cmd 'echo "Port ${__Port}" | sudo tee -a /etc/ssh/sshd_config'
-    fi
     _cmd 'sudo sed -i "/ipv6=/Id" /etc/default/ufw'
     _cmd 'echo "IPV6=no" | sudo tee -a /etc/default/ufw'
     if [ -f "$FILE" ]; then rm $FILE; fi
     wget -q -O $FILE $CF >/dev/null 2>&1 
-    while read ip4; do _cmd "sudo ufw allow from $ip4 to any port 80"; done < $FILE
-    while read ip4; do _cmd "sudo ufw allow from $ip4 to any port 443"; done < $FILE
+#    while read ip4; do _cmd 'sudo ufw allow from ${ip4} to any port 80 comment "cloudflare IPs"'; done < $FILE
+    while read ip4; do _cmd 'sudo ufw allow from ${ip4} to any port 443 comment "cloudflare IPs"'; done < $FILE
+
+
+# grub
+_task "update grub"
+    _cmd 'sudo sed -i "/GRUB_CMDLINE_LINUX_DEFAULT=/Id" /etc/default/grub'
+    _cmd 'echo "GRUB_CMDLINE_LINUX_DEFAULT=\"ipv6.disable=1 quiet splash\"" | sudo tee -a /etc/default/grub'
+printf "${OVERWRITE}"
+
+
+# Update SSHD_CONFIG 
+GIT="https://raw.githubusercontent.com/martyb95/hardening/main"
+_task "update sshd_conf"
+      _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /etc/ssh/sshd_config $GIT/sshd.conf'
+	  
+_task "update ssh port"
+      _cmd 'echo "Port ${__Port}" | sudo tee -a /etc/ssh/sshd_config'
+	
+	
+# Add SSH keys to user	
+_task "add SSH keys to users"
+    _cmd 'mkdir -p /home/${USR}/.ssh'
+    _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /home/${USR}/.ssh/authorized_keys $GIT/authorized_keys'
+    if [[ -d "/home/martin" ]]; then
+       _cmd 'mkdir -p /home/martin/.ssh'
+       _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /home/martin/.ssh/authorized_keys $GIT/authorized_keys'
+	fi
+printf "${OVERWRITE}"
+
+
+# Install Lynis
+TMP=$(lynis show version)
+_task "install Lynis audit software"
+	if [[ "$TMP" != "3."* ]]; then 
+	   _cmd 'wget --timeout=5 --tries=2 --quiet -O - https://packages.cisofy.com/keys/cisofy-software-public.key | sudo apt-key add -'
+	   _cmd 'echo "deb https://packages.cisofy.com/community/lynis/deb/ stable main" | sudo tee /etc/apt/sources.list.d/cisofy-lynis.list'
+    fi
+	_cmd 'sudo apt-get update'
+	_cmd 'sudo apt-get install lynis -y'
+
+
+# Install Fail2Ban
+_task "install Fail2Ban"
+	_cmd 'sudo apt-get install fail2ban -y'
+    _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /etc/fail2ban/jail.local $GIT/jail.local'
 
 
 # Install Docker
-GIT="https://github.com/docker/compose/releases/download/v2.6.1"
 if [[ $__Dock == "Y" ]]; then
-  _task "install docker"
-    _cmd 'sudo mkdir -p /home/${USR}/docker/'  
-    _cmd 'sudo apt install curl -y'
-    _cmd 'sudo curl -fsSL https://get.docker.com | sh'
-    _cmd 'sudo wget -q -O /usr/local/bin/docker-compose $GIT/docker-compose-linux-x86_64'
-	_cmd 'sudo chmod +x /usr/local/bin/docker-compose'
-	_cmd 'docker network inspect CG_Cloud >/dev/null 2>&1 || docker network create --driver bridge CG_Cloud'
+    _task "install docker"
+		 _cmd 'sudo apt install apt-transport-https ca-certificates curl software-properties-common -y'
+		 _cmd 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -'
+		 _cmd 'sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"'
+         _cmd 'sudo apt-get update'
+         sudo apt-get install docker-ce -y >/dev/null 2>&1
+
+
+# Install Docker-Compose
+   GIT="https://github.com/docker/compose/releases/download/v2.6.1/docker-compose-linux-x86_64"
+    _task "install docker-compose"
+         _cmd 'sudo curl -SL ${GIT} -o /usr/local/bin/docker-compose'
+         _cmd 'chmod +x /usr/local/bin/docker-compose'
+
+
+# Wait for Docker Service to Start
+   _task "wait for docker service to start"
+        ISACT=$( (sudo systemctl is-active docker ) 2>&1 )
+        if [[ "$ISACt" != "active" ]]; then
+           X=0
+           while [[ "$ISACT" != "active" ]] && [[ $X -le 10 ]]; do
+               sudo systemctl start docker >> ~/docker-script-install.log 2>&1
+               sleep 10s &
+               pid=$! # Process Id of the previous running command
+               spin='-\|/'
+               i=0
+               while kill -0 $pid 2>/dev/null
+               do
+                   i=$(( (i+1) %4 ))
+                   printf "\r${spin:$i:1}"
+                   sleep .1
+               done
+               ISACT=`sudo systemctl is-active docker`
+               let X=X+1
+           done
+		   if [ X -gt 0 ]]; then printf "\b"; fi
+       fi
+printf "${OVERWRITE}"
+
+
+# Create private docker network
+    _task "create private docker network"
+          _cmd 'sudo docker network inspect ${NET} >/dev/null 2>&1 || sudo docker network create --driver bridge ${NET}'
+          if [[ -d "/home/martin" ]]; then _cmd 'sudo adduser martin docker'; fi		  
 fi
 
-docker network inspect CG_Cloud >/dev/null 2>&1 || docker network create --driver bridge CG_Cloud
+
 # Create Docker User
 if [[ $__DockUsr == "Y" ]]; then
   _task "creating docker user"
-       getent passwd $1 > /dev/null 2&>1
+       getent passwd $USR > /dev/null 2&>1
        if [ $? -ne 0 ]; then _cmd 'sudo useradd -m -g docker -d /home/${USR}/ ${USR}'; fi    
 	   _cmd 'echo ${USR}:${USR-PWD} | sudo chpasswd'
+       _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /home/${USR}/.bashrc'
 fi
 
 
@@ -279,9 +355,10 @@ GIT="https://raw.githubusercontent.com/martyb95/hardening/main"
 if [[ $__NGINX == "Y" ]]; then
   _task "install NGINX Proxy Manager"
 	_cmd 'sudo mkdir -p /home/${USR}/nginxpm'
+	_cmd 'sudo mkdir -p /home/${USR}/nginxpm/letsencrypt'
 	_cmd 'sudo mkdir -p /home/${USR}/mysql'
 	_cmd 'sudo wget -q -O /home/${USR}/nginxpm/docker-compose.yml $GIT/nginx-pm.yml'
-	_cmd 'sudo docker-compose -f home/${USR}/nginxpm/docker-compose.yml up -d'
+	_cmd 'sudo docker-compose -f /home/${USR}/nginxpm/docker-compose.yml up -d'
 fi
 
 
@@ -290,9 +367,18 @@ if [[ $__Portainer == "Y" ]]; then
   _task "install Portainer-CE"
 	_cmd 'sudo mkdir -p /home/${USR}/portainer'
 	_cmd 'sudo mkdir -p /home/${USR}/portainer/ssl'
-	_cmd 'sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout /home/${USR}/portainer/ssl/portainer.key -x509 -days 365 -out /home/${USR}/portainer/ssl/portainer.crt'
+	_cmd 'sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout /home/${USR}/portainer/ssl/portainer.key -x509 -days 365 -out /home/${USR}/portainer/ssl/portainer.crt -subj "/C=CA/ST=Ontario/L=Burlington/O=CareGo Tek/OU=/CN=caregotek.com"'
 	_cmd 'sudo wget -q -O /home/${USR}/portainer/docker-compose.yml $GIT/portainer.yml'
 	_cmd 'sudo docker-compose -f /home/${USR}/portainer/docker-compose.yml up -d'
+fi
+
+
+# Install Watchtower
+if [[ $__Dozzle == "Y" ]]; then
+  _task "install Dozzle"
+	_cmd 'sudo mkdir -p /home/${USR}/dozzle'
+	_cmd 'sudo wget -q -O /home/${USR}/dozzle/docker-compose.yml $GIT/dozzle.yml'
+	_cmd 'sudo docker-compose -f /home/${USR}/dozzle/docker-compose.yml up -d'
 fi
 
 
@@ -305,29 +391,19 @@ if [[ $__Watchtower == "Y" ]]; then
 fi
 
 
-
-
-# grub
-_task "update grub"
-    _cmd 'sudo sed -i "/GRUB_CMDLINE_LINUX_DEFAULT=/Id" /etc/default/grub'
-    _cmd 'echo "GRUB_CMDLINE_LINUX_DEFAULT=\"ipv6.disable=1 quiet splash\"" | sudo tee -a /etc/default/grub'
-
-
 # remove unrequired services & packages
 _task "remove unrequired services & packages"
-    _cmd 'sudo apt $PURGE delete xinetd nis yp-tools tftpd atftpd tftpd-hpa'
-	_cmd 'sudo apt $PURGE delete telnetd rsh-server rsh-redone-server'
-	_cmd 'sudo apt $PURGE delete curl git'	
+    _cmd 'sudo apt-get purge --auto-remove xinetd nis yp-tools tftpd atftpd tftpd-hpa -y'
+	_cmd 'sudo apt-get purge --auto-remove telnetd rsh-server rsh-redone-server -y'
+	_cmd 'sudo apt-get purge --auto-remove git curl wget -y'
 	
 
 # Clean disk space
 _task "clean up disk space"
     _cmd 'sudo find /var/log -type f -delete'
     _cmd 'sudo rm -rf /usr/share/man/*'
-    _cmd 'sudo apt autoremove -y'
-    _cmd 'sudo apt autoclean -y'
-
-
+    _cmd 'sudo apt-get autoremove -y'
+    _cmd 'sudo apt-get autoclean -y'
 
 
 # reset system
@@ -340,19 +416,19 @@ _task "reload system"
 
 
 # finish last task
-printf "${OVERWRITE}${LGREEN} [✓]  ${LGREEN}${TASK}\n"
+printf "${OVERWRITE}${LGREEN} [✓]  ${LGREEN}${TASK}\n\n\n"
 
 # remove conduro.log
-sudo rm conduro.log
+sudo rm conduro.log >/dev/null 2>&1
 
 # reboot
-prompt=$(Ask "Do you wish to reboot (Y) " "Y")
-if [[ $prompt == "Y" ]]; then
+_AskYN "Reboot? (y/n)" "Y" && __prompt=$REPLY
+if [[ $__prompt == "Y" ]]; then
     sudo reboot
 fi
 
 # exit
-exit 1
+exit 0
 
 # # description
 # _task "disable multipathd"
