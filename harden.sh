@@ -20,41 +20,45 @@ LCYAN='\033[01;36m'
 WHITE='\033[01;37m'
 OVERWRITE='\e[1A\e[K'
 
-USR='docker'
-USR-PWD='Docker!2022'
-CAREGO='192.168.10.75'
+FILE="ip4.txt"
+CF="https://www.cloudflare.com/ips-v4"
+PublicIP=$(curl -s ifconfig.me)
+LocalIP='192.168.10.75'
+#LocalIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
+CAREGO='216.113.113.154'
 NET='CG_Cloud'
+SECONDS=0
 
 
 # _header colorize the given argument with spacing
 function _task {
-    # if _task is called while a task was set, complete the previous
-    if [[ $TASK != "" ]]; then
-        printf "${OVERWRITE}${LGREEN} [✓]  ${LGREEN}${TASK}\n"
-    fi
-    # set new task title and print
-    TASK=$1
-    printf "${LCYAN} [ ]  ${TASK} \n${LRED}"
+   # if _task is called while a task was set, complete the previous
+   if [[ $TASK != "" ]]; then
+       printf "${OVERWRITE}${LGREEN} [✓]  ${LGREEN}${TASK}\n"
+   fi
+   # set new task title and print
+   TASK=$1
+   printf "${LCYAN} [ ]  ${TASK} \n${LRED}"
 }
 
 # _cmd performs commands with error checking
 function _cmd {
-    # empty conduro.log
-    > conduro.log
-    # hide stdout, on error we print and exit
-    if eval "$1" 1> /dev/null 2> conduro.log; then
-        return 0 # success
-    fi
-    # read error from log and add spacing
-    printf "${OVERWRITE}${LRED} [X]  ${TASK}${LRED}\n"
-    while read line; do 
-        printf "      ${line}\n"
-    done < conduro.log
-    printf "\n"
-    # remove log file
-    rm conduro.log
-    # exit installation
-    exit 1
+   # empty conduro.log
+   > conduro.log
+   # hide stdout, on error we print and exit
+   if eval "$1" 1> /dev/null 2> conduro.log; then
+     return 0 # success
+   fi
+   # read error from log and add spacing
+   printf "${OVERWRITE}${LRED} [X]  ${TASK}${LRED}\n"
+   while read line; do
+      printf "      ${line}\n"
+   done < conduro.log
+   printf "\n"
+   # remove log file
+   rm conduro.log
+   # exit installation
+   exit 1
 }
 
 function _Ask()
@@ -108,7 +112,6 @@ function _AskYN()
 
 
 clear
-
 # print logo + information
 printf "${CYAN}
 
@@ -131,288 +134,267 @@ printf "                                                                    ${YE
 
 # script must be run as root
 if [[ $(id -u) -ne 0 ]] ; then printf "\n${LRED} Please run as root${RESTORE}\n\n" ; exit 1 ; fi
+__OS=$(lsb_release -d | awk '{print $2}')
+if [[ ${__OS} != "Ubuntu" ]]; then printf "\n${LRED} Unknown operating system. Script cannot run.\n\n${RESTORE}$(lsb_release -a)\n\n" ; exit 1 ; fi
+
+
 _AskYN "Continue (y/n)" "Y"
 if [[ ${REPLY^^} != "Y" ]] ; then exit 0 ; fi
-
 printf "\n"
 _Ask "Change ssh port" "22" && __Port=$REPLY
-_AskYN "Install Docker (y/n)" "Y" && __Dock=$REPLY
-if [[ $__Dock == "Y" ]]; then
-    _AskYN "Install NGINX Proxy Manager (y/n)" "Y" && __NGINX=$REPLY
-    _AskYN "Install Docker User (y/n)" "Y" && __DockUsr=$REPLY
-    _AskYN "Install Portainer (y/n)" "Y" && __Portainer=$REPLY
-    _AskYN "Install Dozzle (y/n)" "Y" && __Dozzle=$REPLY
-    _AskYN "Install Watchtower (y/n)" "Y" && __Watchtower=$REPLY
-fi
-
+_AskYN "Create Martin user (y/n)" "Y" && __USR=$REPLY
+_AskYN "Install NGINX Proxy Manager (y/n)" "Y" && __NGINX=$REPLY
+_AskYN "Install Antivirus & Rootkit (y/n)" "Y" && __VIRUS=$REPLY
 printf "\n\n"
 
 
-# script must be one of the OS's above
-#if [[ $OS == "UNKNOWN" ]]; then printf "\n${LRED} Unknown operating system ($OSName). Script cannot run.${RESTORE}\n\n" ; exit 1 ; fi
-
 # update OS dependencies
 _task "update operating system"
-    _cmd 'sudo apt-get  update'
-    _cmd 'sudo apt-get full-upgrade -y'
+   _cmd 'sudo apt-get update'
+   _cmd 'sudo apt-get full-upgrade -y'
 
 
 # update application dependencies
 _task "update app dependencies"
-    _cmd 'sudo apt-get install nano curl wget ufw sed -y'
+   _cmd 'sudo apt-get install nano curl wget ufw sed -y'
    _cmd 'sudo apt-get full-upgrade -y'
 
-
 # remove existing applications
-service docker status >/dev/null 2>&1
-ISACT=$?
 _task "remove apps to be reinstalled"
-     _cmd 'sudo apt-get purge --auto-remove lynis fail2ban -y'
-	 if [ "${ISACT}" = 0 ]; then _cmd 'sudo systemctl stop docker'; fi
-     if [[ $(which docker) && $(sudo docker --version) ]]; then
-        _cmd 'sudo apt-get remove docker docker-engine docker.io containerd runc -y'
-        _cmd 'sudo apt-get purge docker-ce docker-ce-cli containerd.io docker-compose -y'
-	    _cmd 'sudo rm -f /usr/share/keyrings/docker-archive-keyring.gpg'
-        _cmd 'sudo rm -rf /var/lib/docker'
-        _cmd 'sudo rm -rf /var/lib/containerd'
-       _cmd 'sudo rm -f /usr/local/bin/docker-compose'
-     fi
-     _cmd 'sudo apt update'
-     _cmd 'sudo apt-get autoremove -y'
-     _cmd 'sudo apt-get autoclean -y'
-printf "${OVERWRITE}"
+   _cmd 'sudo apt-get purge --auto-remove lynis fail2ban -y'
+   _cmd 'sudo apt update'
+   _cmd 'sudo apt-get autoremove -y'
+   _cmd 'sudo apt-get autoclean -y'
+   printf "${OVERWRITE}"
 
 
 # update shell command prompt
 PRPT="\[\033[0;31m\]\342\224\214\342\224\200\[\[\033[0;39m\]\u\[\033[01;33m\]@\[\033[01;96m\]\h\[\033[0;31m\]]\342\224\200[\[\033[0;32m\]\w\[\033[0;31m\]]\n\[\033[0;31m\]\342\224\224\342\224\200\342\224\200\342\224\200 \[\033[0m\]\[\e[01;33m\]\\$\[\e[0m\]"
-_task "update shell command prompt"
-    _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /etc/bash.bashrc'
-    if [[ -d "/home/martin" ]]; then _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /home/martin/.bashrc'; fi
-    if [[ ${USER} != "root" ]]; then _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /home/${USER}/.bashrc'; fi
+task "update shell command prompt"
+  _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /etc/bash.bashrc'
+  if [[ -d "/home/martin" ]]; then _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /home/martin/.bashrc'; fi
+  if [[ ${USER} != "root" ]]; then _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /home/${USER}/.bashrc'; fi
 
 
 # Update Nameservers
 _task "update nameservers"
-    _cmd 'sudo truncate -s0 /etc/resolv.conf'
-    _cmd 'echo "nameserver 1.1.1.1" | sudo tee -a /etc/resolv.conf'
-    _cmd 'echo "nameserver 1.0.0.1" | sudo tee -a /etc/resolv.conf'
+   _cmd 'sudo truncate -s0 /etc/resolv.conf'
+   _cmd 'echo "nameserver 1.1.1.1" | sudo tee -a /etc/resolv.conf'
+   _cmd 'echo "nameserver 1.0.0.1" | sudo tee -a /etc/resolv.conf'
+
 
 # Update NTP servers
 _task "update ntp servers"
-    _cmd 'sudo truncate -s0 /etc/systemd/timesyncd.conf'
-    _cmd 'echo "[Time]" | sudo tee -a /etc/systemd/timesyncd.conf'
-    _cmd 'echo "NTP=time.cloudflare.com" | sudo tee -a /etc/systemd/timesyncd.conf'
-    _cmd 'echo "FallbackNTP=ca.pool.ntp.org" | sudo tee -a /etc/systemd/timesyncd.conf'
+   _cmd 'sudo truncate -s0 /etc/systemd/timesyncd.conf'
+   _cmd 'echo "[Time]" | sudo tee -a /etc/systemd/timesyncd.conf'
+   _cmd 'echo "NTP=time.cloudflare.com" | sudo tee -a /etc/systemd/timesyncd.conf'
+   _cmd 'echo "FallbackNTP=ca.pool.ntp.org" | sudo tee -a /etc/systemd/timesyncd.conf'
 
 
-# Download and Update sysctl.conf
-_task "download and update sysctl.conf"
-    _cmd 'sudo wget --timeout=5 --tries=2 --quiet -c https://raw.githubusercontent.com/conduro/ubuntu/main/sysctl.conf -O /etc/sysctl.conf'
-
-
-# disable system logging
-_task "disable system logging"
-    _cmd 'sudo systemctl stop systemd-journald.service'
-    _cmd 'sudo systemctl disable systemd-journald.service'
-    _cmd 'sudo systemctl mask systemd-journald.service'
-    _cmd 'sudo systemctl stop rsyslog.service'
-    _cmd 'sudo systemctl disable rsyslog.service'
-    _cmd 'sudo systemctl mask rsyslog.service'
-
-# Disable SNAPD
-_task "disable snapd"
-  _cmd 'sudo systemctl stop snapd.service'
-  _cmd 'sudo systemctl disable snapd.service'
-  _cmd 'sudo systemctl mask snapd.service'
-
-
-# firewall
-FILE="ip4.txt"
-CF="https://www.cloudflare.com/ips-v4"
-IP4=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
-_task "configure firewall"
-    _cmd 'sudo ufw disable'
-    _cmd 'echo "y" | sudo ufw reset'
-    _cmd 'sudo ufw logging off'
-    _cmd 'sudo ufw default deny incoming'
-    _cmd 'sudo ufw default allow outgoing'
-    _cmd 'sudo ufw allow from ${CAREGO} to any port 3389 proto tcp comment "rdp"'
-    _cmd 'sudo ufw allow from ${CAREGO} to any port ${__Port} proto tcp comment "ssh"'
-    _cmd 'sudo ufw limit ${__Port}'
-    _cmd 'sudo sed -i "/ipv6=/Id" /etc/default/ufw'
-    _cmd 'echo "IPV6=no" | sudo tee -a /etc/default/ufw'
-    if [ -f "$FILE" ]; then rm $FILE; fi
-    wget -q -O $FILE $CF >/dev/null 2>&1 
-#    while read ip4; do _cmd 'sudo ufw allow from ${ip4} to any port 80 comment "cloudflare IPs"'; done < $FILE
-    while read ip4; do _cmd 'sudo ufw allow from ${ip4} to any port 443 comment "cloudflare IPs"'; done < $FILE
-
-
-# grub
-_task "update grub"
-    _cmd 'sudo sed -i "/GRUB_CMDLINE_LINUX_DEFAULT=/Id" /etc/default/grub'
-    _cmd 'echo "GRUB_CMDLINE_LINUX_DEFAULT=\"ipv6.disable=1 quiet splash\"" | sudo tee -a /etc/default/grub'
-printf "${OVERWRITE}"
-
-
-# Update SSHD_CONFIG 
+# add martin user
 GIT="https://raw.githubusercontent.com/martyb95/hardening/main"
+if [[ $__USR == "Y" ]]; then
+  _task "create martin user"
+     if [[ -z $(id -u "martin" 2>/dev/null) ]]; then _cmd 'sudo useradd -m martin'; fi
+     _cmd 'sudo usermod -a -G sudo,lxd,adm martin'
+     _cmd 'mkdir -p /home/martin/.ssh'
+     _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /home/martin/.ssh/authorized_keys $GIT/authorized_keys'
+     _cmd 'sudo chmod 0700 /home/martin/.ssh/'
+fi
+
+
+# Update SSHD_CONFIG
 _task "update sshd_conf"
-      _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /etc/ssh/sshd_config $GIT/sshd.conf'
-	  
+   _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /etc/ssh/sshd_config $GIT/sshd.conf'
+
 _task "update ssh port"
-      _cmd 'echo "Port ${__Port}" | sudo tee -a /etc/ssh/sshd_config'
-	
-	
-# Add SSH keys to user	
+   _cmd 'echo "Port ${__Port}" | sudo tee -a /etc/ssh/sshd_config'
+
+
+# Add SSH keys to user
 _task "add SSH keys to users"
-    _cmd 'mkdir -p /home/${USR}/.ssh'
-    _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /home/${USR}/.ssh/authorized_keys $GIT/authorized_keys'
-    if [[ -d "/home/martin" ]]; then
-       _cmd 'mkdir -p /home/martin/.ssh'
-       _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /home/martin/.ssh/authorized_keys $GIT/authorized_keys'
-	fi
-printf "${OVERWRITE}"
+   if [ ${USER} != "root" ]; then
+     _cmd 'mkdir -p /home/${USER}/.ssh'
+     _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /home/${USER}/.ssh/authorized_keys $GIT/authorized_keys'
+     _cmd 'sudo chmod 0700 /home/${USER}/.ssh/'
+   fi
+   printf "${OVERWRITE}"
 
 
 # Install Lynis
 TMP=$(lynis show version)
 _task "install Lynis audit software"
-	if [[ "$TMP" != "3."* ]]; then 
-	   _cmd 'wget --timeout=5 --tries=2 --quiet -O - https://packages.cisofy.com/keys/cisofy-software-public.key | sudo apt-key add -'
-	   _cmd 'echo "deb https://packages.cisofy.com/community/lynis/deb/ stable main" | sudo tee /etc/apt/sources.list.d/cisofy-lynis.list'
-    fi
-	_cmd 'sudo apt-get update'
-	_cmd 'sudo apt-get install lynis -y'
+   if [[ "$TMP" != "3."* ]]; then
+     _cmd 'wget --timeout=5 --tries=2 --quiet -O - https://packages.cisofy.com/keys/cisofy-software-public.key | sudo apt-key add -'
+     _cmd 'echo "deb https://packages.cisofy.com/community/lynis/deb/ stable main" | sudo tee /etc/apt/sources.list.d/cisofy-lynis.list'
+   fi
+   _cmd 'sudo apt-get update'
+   _cmd 'sudo apt-get install lynis -y'
+
+
+# Install NGINX Proxy Manager
+NGX="https://raw.githubusercontent.com/ej52/proxmox-scripts/main/lxc/nginx-proxy-manager/setup.sh"
+if [[ $__NGINX == "Y" ]]; then
+  _task "install NGINX Proxy Manager"
+     wget --no-cache -qO - ${NGX} | sudo sh >/dev/null 2>&1
+     sudo rm -f setup.sh >/dev/null 2>&1
+     sudo mv /var/lib/dpkg/info/install-info.postinst /var/lib/dpkg/info/install-info.postinst.bad >/dev/null 2>&1
+     _cmd 'sudo apt update'
+fi
+
+
+# firewall
+_task "configure firewall"
+   _cmd 'sudo ufw disable'
+   _cmd 'echo "y" | sudo ufw reset'
+   _cmd 'sudo ufw logging off'
+   _cmd 'sudo ufw default deny incoming'
+   _cmd 'sudo ufw default allow outgoing'
+   # Add rules for the CareGo public IP
+   _cmd 'sudo ufw allow from ${CAREGO} to any port 3389 proto tcp comment "rdp"'
+   _cmd 'sudo ufw allow from ${CAREGO} to any port ${__Port} proto tcp comment "ssh"'
+   _cmd 'sudo ufw allow from ${CAREGO} to any port 81 proto tcp comment "nginxpm"'
+   _cmd 'sudo ufw allow from ${CAREGO} to any port 80 proto tcp comment "HTTP"'
+   _cmd 'sudo ufw allow from ${CAREGO} to any port 443 proto tcp comment "HTTPS"'
+   if [ ${PublicIP} != ${CAREGO} ]; then
+      # Add rules for Public IP
+      _cmd 'sudo ufw allow from ${PublicIP} to any port ${__Port} proto tcp comment "ssh"'
+      _cmd 'sudo ufw allow from ${PublicIP} to any port 81 proto tcp comment "nginxpm"'
+      _cmd 'sudo ufw allow from ${PublicIP} to any port 80 proto tcp comment "HTTP"'
+      _cmd 'sudo ufw allow from ${PublicIP} to any port 443 proto tcp comment "HTTPS"'
+      # Add rules for the computer that is running the script
+      _cmd 'sudo ufw allow from ${LocalIP} to any port ${__Port} proto tcp comment "ssh"'
+      _cmd 'sudo ufw allow from ${LocalIP} to any port 81 proto tcp comment "nginxpm"'
+      _cmd 'sudo ufw allow from ${LocalIP} to any port 80 proto tcp comment "HTTP"'
+      _cmd 'sudo ufw allow from ${LocalIP} to any port 443 proto tcp comment "HTTPS"'	  
+   fi
+   _cmd 'sudo ufw limit ${__Port}'
+   _cmd 'sudo sed -i "/ipv6=/Id" /etc/default/ufw'
+   _cmd 'echo "IPV6=no" | sudo tee -a /etc/default/ufw'
+   # Add rules to allow cloudflare into the VM
+   if [ -f "$FILE" ]; then rm $FILE; fi
+   wget --timeout=5 --tries=2 --quiet -O $FILE $CF >/dev/null 2>&1
+   while read ip4; do _cmd 'sudo ufw allow from ${ip4} to any port 80 proto tcp comment "cloudflare IPs"'; done < $FILE
+   while read ip4; do _cmd 'sudo ufw allow from ${ip4} to any port 443 proto tcp comment "cloudflare IPs"'; done < $FILE
+   # Disable ping / ICMP to the VM
+   sudo sed -i '/ufw-before-input.*icmp/s/ACCEPT/DROP/g' /etc/ufw/before.rules >/dev/null 2>&1
+   sudo sed -i '/ufw-before-forward.*icmp/s/ACCEPT/DROP/g' /etc/ufw/before.rules >/dev/null 2>&1
+
+# Install antivirus & rootkit
+if [[ $__VIRUS == "Y" ]]; then
+  _task "install antivirus and rootkit"
+     _cmd 'sudo apt-get install chkrootkit clamav clamav-daemon -y'
+	 _cmd 'sudo systemctl stop clamav-freshclam'
+	 _cmd 'sudo freshclam'
+	 _cmd 'sudo systemctl start clamav-freshclam'
+fi
 
 
 # Install Fail2Ban
 _task "install Fail2Ban"
-	_cmd 'sudo apt-get install fail2ban -y'
-    _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /etc/fail2ban/jail.local $GIT/jail.local'
+   _cmd 'sudo apt-get install fail2ban -y'
+   _cmd 'sudo wget --timeout=5 --tries=2 --quiet -O /etc/fail2ban/jail.local $GIT/jail.local'
 
 
-# Install Docker
-if [[ $__Dock == "Y" ]]; then
-    _task "install docker"
-		 _cmd 'sudo apt install apt-transport-https ca-certificates curl software-properties-common -y'
-		 _cmd 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -'
-		 _cmd 'sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"'
-         _cmd 'sudo apt-get update'
-         sudo apt-get install docker-ce -y >/dev/null 2>&1
+# Download and Update sysctl.conf
+_task "download and update sysctl.conf"
+   _cmd 'sudo wget --timeout=5 --tries=2 --quiet -c https://raw.githubusercontent.com/conduro/ubuntu/main/sysctl.conf -O /etc/sysctl.conf'
+   _cmd 'sudo sysctl -p'
 
 
-# Install Docker-Compose
-   GIT="https://github.com/docker/compose/releases/download/v2.6.1/docker-compose-linux-x86_64"
-    _task "install docker-compose"
-         _cmd 'sudo curl -SL ${GIT} -o /usr/local/bin/docker-compose'
-         _cmd 'chmod +x /usr/local/bin/docker-compose'
+# disable system logging
+_task "disable system logging"
+  _cmd 'sudo systemctl stop systemd-journald.service'
+  _cmd 'sudo systemctl disable systemd-journald.service'
+  _cmd 'sudo systemctl mask systemd-journald.service'
+  _cmd 'sudo systemctl stop rsyslog.service'
+  _cmd 'sudo systemctl disable rsyslog.service'
+  _cmd 'sudo systemctl mask rsyslog.service'
 
 
-# Wait for Docker Service to Start
-   _task "wait for docker service to start"
-        ISACT=$( (sudo systemctl is-active docker ) 2>&1 )
-        if [[ "$ISACt" != "active" ]]; then
-           X=0
-           while [[ "$ISACT" != "active" ]] && [[ $X -le 10 ]]; do
-               sudo systemctl start docker >> ~/docker-script-install.log 2>&1
-               sleep 10s &
-               pid=$! # Process Id of the previous running command
-               spin='-\|/'
-               i=0
-               while kill -0 $pid 2>/dev/null
-               do
-                   i=$(( (i+1) %4 ))
-                   printf "\r${spin:$i:1}"
-                   sleep .1
-               done
-               ISACT=`sudo systemctl is-active docker`
-               let X=X+1
-           done
-		   if [ X -gt 0 ]]; then printf "\b"; fi
-       fi
-printf "${OVERWRITE}"
+# Disable SNAPD
+_task "disable snapd"
+   _cmd 'sudo systemctl stop snapd.service'
+   _cmd 'sudo systemctl disable snapd.service'
+   _cmd 'sudo systemctl mask snapd.service'
 
 
-# Create private docker network
-    _task "create private docker network"
-          _cmd 'sudo docker network inspect ${NET} >/dev/null 2>&1 || sudo docker network create --driver bridge ${NET}'
-          if [[ -d "/home/martin" ]]; then _cmd 'sudo adduser martin docker'; fi		  
-fi
+# grub
+#_task "update grub"
+#   _cmd 'sudo sed -i "/GRUB_CMDLINE_LINUX_DEFAULT=/Id" /etc/default/grub'
+#   _cmd 'echo "GRUB_CMDLINE_LINUX_DEFAULT=\"ipv6.disable=1 quiet splash\"" | sudo tee -a /etc/default/grub'
+#   printf "${OVERWRITE}"
 
 
-# Create Docker User
-if [[ $__DockUsr == "Y" ]]; then
-  _task "creating docker user"
-       getent passwd $USR > /dev/null 2&>1
-       if [ $? -ne 0 ]; then _cmd 'sudo useradd -m -g docker -d /home/${USR}/ ${USR}'; fi    
-	   _cmd 'echo ${USR}:${USR-PWD} | sudo chpasswd'
-       _cmd 'echo "PS1=\"${PRPT}\"" | sudo tee -a /home/${USR}/.bashrc'
-fi
+# Disable compilers
+_task "disable compilers"
+   sudo chmod 000 /usr/bin/byacc >/dev/null 2>&1
+   sudo chmod 000 /usr/bin/yacc >/dev/null 2>&1
+   sudo chmod 000 /usr/bin/bcc >/dev/null 2>&1
+   sudo chmod 000 /usr/bin/kgcc >/dev/null 2>&1
+   sudo chmod 000 /usr/bin/cc >/dev/null 2>&1
+   sudo chmod 000 /usr/bin/gcc >/dev/null 2>&1
+   sudo chmod 000 /usr/bin/*c++ >/dev/null 2>&1
+   sudo chmod 000 /usr/bin/*g++ >/dev/null 2>&1
+   # 755 to bring them back online
+   # It is better to restrict access to them
+   # unless you are working with a specific one
 
 
-# Install NGINX Proxy Manager
-GIT="https://raw.githubusercontent.com/martyb95/hardening/main"
-if [[ $__NGINX == "Y" ]]; then
-  _task "install NGINX Proxy Manager"
-	_cmd 'sudo mkdir -p /home/${USR}/nginxpm'
-	_cmd 'sudo mkdir -p /home/${USR}/nginxpm/letsencrypt'
-	_cmd 'sudo mkdir -p /home/${USR}/mysql'
-	_cmd 'sudo wget -q -O /home/${USR}/nginxpm/docker-compose.yml $GIT/nginx-pm.yml'
-	_cmd 'sudo docker-compose -f /home/${USR}/nginxpm/docker-compose.yml up -d'
-fi
-
-
-# Install Portainer
-if [[ $__Portainer == "Y" ]]; then
-  _task "install Portainer-CE"
-	_cmd 'sudo mkdir -p /home/${USR}/portainer'
-	_cmd 'sudo mkdir -p /home/${USR}/portainer/ssl'
-	_cmd 'sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout /home/${USR}/portainer/ssl/portainer.key -x509 -days 365 -out /home/${USR}/portainer/ssl/portainer.crt -subj "/C=CA/ST=Ontario/L=Burlington/O=CareGo Tek/OU=/CN=caregotek.com"'
-	_cmd 'sudo wget -q -O /home/${USR}/portainer/docker-compose.yml $GIT/portainer.yml'
-	_cmd 'sudo docker-compose -f /home/${USR}/portainer/docker-compose.yml up -d'
-fi
-
-
-# Install Watchtower
-if [[ $__Dozzle == "Y" ]]; then
-  _task "install Dozzle"
-	_cmd 'sudo mkdir -p /home/${USR}/dozzle'
-	_cmd 'sudo wget -q -O /home/${USR}/dozzle/docker-compose.yml $GIT/dozzle.yml'
-	_cmd 'sudo docker-compose -f /home/${USR}/dozzle/docker-compose.yml up -d'
-fi
-
-
-# Install Watchtower
-if [[ $__Watchtower == "Y" ]]; then
-  _task "install Watchtower"
-	_cmd 'sudo mkdir -p /home/${USR}/watchtower'
-	_cmd 'sudo wget -q -O /home/${USR}/watchtower/docker-compose.yml $GIT/watchtower.yml'
-	_cmd 'sudo docker-compose -f /home/${USR}/watchtower/docker-compose.yml up -d'
-fi
+# Kernel Tuning
+#_task "tune kernel for security"
+#   _cmd 'sysctl kernel.randomize_va_space=1'
+   # Enable IP spoofing protection
+#   _cmd 'sysctl net.ipv4.conf.all.rp_filter=1'
+   # Disable IP source routing
+#   _cmd 'sysctl net.ipv4.conf.all.accept_source_route=0'
+   # Ignoring broadcasts request
+#   _cmd 'sysctl net.ipv4.icmp_echo_ignore_broadcasts=1'
+   # Make sure spoofed packets get logged
+#   _cmd 'sysctl net.ipv4.conf.all.log_martians=1'
+#   _cmd 'sysctl net.ipv4.conf.default.log_martians=1'
+   # Disable ICMP routing redirects
+#   _cmd 'sysctl -w net.ipv4.conf.all.accept_redirects=0'
+#   _cmd 'sysctl -w net.ipv6.conf.all.accept_redirects=0'
+#   _cmd 'sysctl -w net.ipv4.conf.all.send_redirects=0'
+   # Disables the magic-sysrq key
+#   _cmd 'sysctl kernel.sysrq=0'
+   # Turn off the tcp_timestamps
+#   _cmd 'sysctl net.ipv4.tcp_timestamps=0'
+   # Enable TCP SYN Cookie Protection
+#   _cmd 'sysctl net.ipv4.tcp_syncookies=1'
+   # Enable bad error message Protection
+#   _cmd 'sysctl net.ipv4.icmp_ignore_bogus_error_responses=1'
+   # RELOAD WITH NEW SETTINGS
+#   _cmd 'sysctl -p'
 
 
 # remove unrequired services & packages
 _task "remove unrequired services & packages"
-    _cmd 'sudo apt-get purge --auto-remove xinetd nis yp-tools tftpd atftpd tftpd-hpa -y'
-	_cmd 'sudo apt-get purge --auto-remove telnetd rsh-server rsh-redone-server -y'
-	_cmd 'sudo apt-get purge --auto-remove git curl wget -y'
-	
+   _cmd 'sudo apt-get purge --auto-remove xinetd nis yp-tools tftpd atftpd tftpd-hpa -y'
+   _cmd 'sudo apt-get purge --auto-remove telnetd rsh-server rsh-redone-server whoopsie -y'
+   _cmd 'sudo apt-get purge --auto-remove nfs-kernel-server nfs-common portmap rpcbind autofs'
+#   _cmd 'sudo apt-get purge --auto-remove git curl wget -y'
+   _cmd 'sudo apt-get autoremove -y'
+   _cmd 'sudo apt-get autoclean -y'
+#   _cmd 'sudo update-rc.d avahi-daemon disable'
+
 
 # Clean disk space
 _task "clean up disk space"
-    _cmd 'sudo find /var/log -type f -delete'
-    _cmd 'sudo rm -rf /usr/share/man/*'
-    _cmd 'sudo apt-get autoremove -y'
-    _cmd 'sudo apt-get autoclean -y'
+   _cmd 'sudo find /var/log -type f -delete'
+   _cmd 'sudo rm -rf /usr/share/man/*'
+   _cmd 'sudo apt-get autoremove -y'
+   _cmd 'sudo apt-get autoclean -y'
 
 
 # reset system
 _task "reload system"
-    _cmd 'sudo sysctl -p'
-    _cmd 'sudo update-grub2'
-    _cmd 'sudo systemctl restart systemd-timesyncd'
-    _cmd 'sudo ufw --force enable'
-    _cmd 'sudo service ssh restart'
+   _cmd 'sudo sysctl -p'
+   _cmd 'sudo update-grub2'
+   _cmd 'sudo systemctl restart systemd-timesyncd'
+   _cmd 'sudo ufw --force enable'
+   _cmd 'sudo service ssh restart'
 
 
 # finish last task
@@ -421,7 +403,18 @@ printf "${OVERWRITE}${LGREEN} [✓]  ${LGREEN}${TASK}\n\n\n"
 # remove conduro.log
 sudo rm conduro.log >/dev/null 2>&1
 
+# Scan system for Virus & rootkits
+if [[ $__VIRUS == "Y" ]]; then
+    printf "=============== Virus Scan =====================\n"
+	clamscan --infected --remove --recursive /
+    printf "\n\n=============== Rootkit Scan =====================\n"
+	chkrootkit
+fi
+
 # reboot
+duration=$SECONDS
+printf "Script Execution: $(($duration / 60)) minutes and $(($duration % 60)) seconds.\n\n"
+
 _AskYN "Reboot? (y/n)" "Y" && __prompt=$REPLY
 if [[ $__prompt == "Y" ]]; then
     sudo reboot
