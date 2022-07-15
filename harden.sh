@@ -403,14 +403,6 @@ printf "${OVERWRITE}${LGREEN} [✓]  ${LGREEN}${TASK}\n\n\n"
 # remove conduro.log
 sudo rm conduro.log >/dev/null 2>&1
 
-# Scan system for Virus & rootkits
-if [[ $__VIRUS == "Y" ]]; then
-    printf "=============== Virus Scan =====================\n"
-	clamscan --infected --remove --recursive /
-    printf "\n\n=============== Rootkit Scan =====================\n"
-	chkrootkit
-fi
-
 # reboot
 duration=$SECONDS
 printf "Script Execution: $(($duration / 60)) minutes and $(($duration % 60)) seconds.\n\n"
